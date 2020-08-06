@@ -8,7 +8,7 @@ Created on Tue Aug  4 13:37:46 2020
 from selenium import webdriver
 from bs4 import BeautifulSoup
 import pandas as pd
-import numpy as np
+import os
 import requests
 import re
 
@@ -17,13 +17,60 @@ def get_fin_data(url, attrs, tickers):
     base_url = url
     web_attrs = attrs
     stocks = tickers
+    fin_data = {}
+    # TODO maybe take in a list of pages you want to get
+    # i.e data = [financials, balance-sheet, cash-flow] then iterate through that
     for stock in stocks:
-        #income_statement = parse_page('financials', stock)
-        #balance_sheet = parse_page('balance-sheet', stock)
-        #cash_flow = parse_page('cash-flow',         stock)
-        price_page = parse_page(None,               stock)
-        
-        
+        # If we did not create a new folder then read the data
+        # Both of these methods return a pd DataFrame
+        path = create_folder(stock)
+        if not path:
+            income_statement = read_csv(stock, 'income.csv')
+            balance_sheet    = read_csv(stock, 'balance.csv')
+            cash_flow        = read_csv(stock, 'cash.csv')
+        else:
+            income_statement = parse_page('financials',    stock)
+            balance_sheet    = parse_page('balance-sheet', stock)
+            cash_flow        = parse_page('cash-flow',     stock)
+            write_csv(path, 'income.csv',  income_statement)
+            write_csv(path, 'balance.csv', balance_sheet)
+            write_csv(path, 'cash.csv',    cash_flow)
+        # fin_data is a dict that maps the stock name to another dict 
+        # Which maps a string to the DataFrame corresponding to that string
+        fin_data[stock] = {'income' : income_statement, 'balance' : balance_sheet
+                           , 'cash' : cash_flow}
+    return fin_data
+  
+def get_stock_data(url, attrs, tickers):
+    global stocks, base_url, web_attrs
+    base_url = url
+    web_attrs = attrs
+    stocks = tickers
+    for stock in stocks:
+        stock_info = parse_page(stock=stock)
+
+parent = 'C:\\Users\\karby\\Desktop\\Python Files\\Finance\\Trading\\YahooScraper\\Financial Data\\'
+def create_folder(stock):
+    path = os.path.join(parent, stock)
+    # I try to make the folder to store the stock data in
+    try:
+        os.mkdir(path)
+        return path
+    # If I get an exception the file already exists
+    # Therefore the data is already in there so I return
+    # False and read the data in a different method
+    except:
+        return False
+
+def read_csv(stock, file_name):
+    path = os.path.join(parent, stock)
+    path = os.path.join(path, file_name)
+    return pd.read_csv(path)
+
+def write_csv(path, file_name, data):
+    path = os.path.join(path, file_name)
+    data.to_csv(path)
+
 def parse_page(key, stock):
     # If the key is None then I want to get the front page of the app
     # Which contains the current price of the stock
@@ -55,7 +102,7 @@ def parse_page(key, stock):
         tabl = soup.find('div', class_='D(tbrg)')
         data = tabl.find_all('div', {'data-test' : 'fin-col'})
         names = tabl.find_all('span', class_='Va(m)')
-        
+       
         # These are the lists and dictionary I will use to create my pd DataFrame
         temp = {}
         rows = []
