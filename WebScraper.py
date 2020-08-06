@@ -40,7 +40,9 @@ def get_fin_data(url, attrs, tickers):
         fin_data[stock] = {'income' : income_statement, 'balance' : balance_sheet
                            , 'cash' : cash_flow}
     return fin_data
-  
+
+# TODO this will be my method for returning the current stock price
+# IDK if I should have a time frame or not
 def get_stock_data(url, attrs, tickers):
     global stocks, base_url, web_attrs
     base_url = url
@@ -62,11 +64,13 @@ def create_folder(stock):
     except:
         return False
 
+# Returns a pandas DataFrame from the csv file
 def read_csv(stock, file_name):
     path = os.path.join(parent, stock)
     path = os.path.join(path, file_name)
     return pd.read_csv(path)
 
+# Writes a pandas DataFrame to a csv file
 def write_csv(path, file_name, data):
     path = os.path.join(path, file_name)
     data.to_csv(path)
