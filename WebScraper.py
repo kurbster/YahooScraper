@@ -51,7 +51,10 @@ def get_stock_data(url, attrs, tickers):
     for stock in stocks:
         stock_info = parse_page(stock=stock)
 
-parent = 'C:\\Users\\karby\\Desktop\\Python Files\\Finance\\Trading\\YahooScraper\\Financial Data\\'
+# Making the parent directory point to our financial data folder
+parent = os.getcwd()
+parent = os.path.join(parent, 'Financial Data')
+
 def create_folder(stock):
     path = os.path.join(parent, stock)
     # I try to make the folder to store the stock data in
