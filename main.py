@@ -6,6 +6,7 @@ Created on Tue Aug  4 13:18:41 2020
 """
 
 import WebScraper as scraper
+from Watcher import Watcher
 
 base_url = 'https://finance.yahoo.com/quote/'
 # These are the generic attrbutes for calling the proper html
@@ -18,4 +19,7 @@ tickers = ['AAPL', 'GOOG', 'FB', 'WMT', 'TSLA', 'MRNA']
 # This is a dictionary mapping the ticker to a dictionary
 # Containing the financial data mapped to its name
 financial_data = scraper.get_fin_data(base_url, web_attrs, tickers)
-stock_data     = scraper.get_stock_data(base_url, web_attrs, tickers)
+#stock_data     = scraper.get_stock_data(base_url, web_attrs, tickers)
+
+watcher = Watcher(tickers)
+watcher.watch(0, 0, 5)
