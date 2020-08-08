@@ -13,9 +13,9 @@ web_attrs = {'stock_key' : '?p='}
 
 # This is the different type of data we want to get
 # And below are the stocks we want to get
-tickers = ['AAPL', 'GOOG', 'MRNA', 'FB', 'TSLA', 'WMT']
+tickers = ['AAPL', 'GOOG', 'FB', 'WMT', 'TSLA', 'MRNA']
 
 # This is a dictionary mapping the ticker to a dictionary
 # Containing the financial data mapped to its name
 financial_data = scraper.get_fin_data(base_url, web_attrs, tickers)
-stock_data = scraper.get_stock_data(base_url, web_attrs, tickers)
+stock_data     = scraper.get_stock_data(base_url, web_attrs, tickers)

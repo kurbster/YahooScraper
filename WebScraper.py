@@ -10,7 +10,6 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import os
 import requests
-import re
 
 def get_fin_data(url, attrs, tickers):
     global stocks, base_url, web_attrs
@@ -41,15 +40,16 @@ def get_fin_data(url, attrs, tickers):
                            , 'cash' : cash_flow}
     return fin_data
 
-# TODO this will be my method for returning the current stock price
-# IDK if I should have a time frame or not
 def get_stock_data(url, attrs, tickers):
     global stocks, base_url, web_attrs
     base_url = url
     web_attrs = attrs
     stocks = tickers
+    fin_data = {}
     for stock in stocks:
         stock_info = parse_page(None, stock)
+        fin_data[stock] = stock_info
+    return fin_data
 
 # Making the parent directory point to our financial data folder
 parent = os.getcwd()
@@ -61,11 +61,18 @@ def create_folder(stock):
     try:
         os.mkdir(path)
         return path
-    # If I get an exception the file already exists
-    # Therefore the data is already in there so I return
-    # False and read the data in a different method
-    except:
+    # If my exception is the file exists then I return false b/c I did not
+    # Create a new file. Therefore the funciton that called this will know
+    # To read a csv file instead of creating one
+    except FileExistsError:
         return False
+    # If I get a file not found error then the Financial Data directory
+    # Isn't set up on this computer. Therefore I have to make the directory
+    # Then recall the method so I can create the stock folder
+    except FileNotFoundError:
+        os.mkdir(parent)
+        # I must return the value of path to the parent 
+        return create_folder(stock)
 
 # Returns a pandas DataFrame from the csv file
 def read_csv(stock, file_name):
@@ -86,10 +93,8 @@ def parse_page(key, stock):
         # There are no buttons I need to press on this page so no need for selenium
         page = requests.get(url)
         soup = BeautifulSoup(page.content, 'html.parser')
-        regex = re.compile('W(100%)*')
-        table = soup.find_all('table', class_=regex)
-        for t in table:
-            print(t.text)
+        table = soup.find_all('table')[0]
+        df = pd.read_html(str(table))
     else:
         # I get the url associated with what ever is passed in
         url = base_url + stock + '/' + key + web_attrs['stock_key'] + stock
@@ -112,19 +117,14 @@ def parse_page(key, stock):
        
         # These are the lists and dictionary I will use to create my pd DataFrame
         temp = {}
-        rows = []
-        cols = []
-        # Columns represents the dates we are taking
-        for c in columns:
-            cols.append(c.text)
+        rows = [n.text for n in names]      # Names of the data we're taking
+        cols = [c.text for c in columns]    # Names of the columns
         # I pop the first value from this list because it is just a placeholder and I dont need it
         cols.pop(0)
-        # Names represents the type of data we are taking
-        for n in names:        
-            rows.append(n.text)
         
         # Data represents that numbers we are taking in. I am using enumerate
-        # Here so I can turn the data into a dictionary 
+        # Here so I can turn the data into a 2D array and have the corresponding
+        # Row names for that data
         for i,d in enumerate(data):
             row_num = i // len(cols)
             # If this is the first entry in a row we have to make the list
@@ -138,7 +138,7 @@ def parse_page(key, stock):
         # Of my dictionary, therefore I just used those values
         df = pd.DataFrame.from_dict(temp, orient='index', columns=cols)
         driver.close()
-        return df
+    return df
     
 
 def click_buttons(element):
