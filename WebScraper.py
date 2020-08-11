@@ -10,7 +10,7 @@ import os
 import requests
 from selenium import webdriver
 from bs4 import BeautifulSoup
-#from pandas_datareader import data as wb
+from pandas_datareader import data as wb
 
 '''
     get_fin_data will get the financial data for the specific stock passed in
@@ -46,8 +46,9 @@ def get_fin_data(url, attrs, stock, **kw):
     fin_data[stock] = {'income'   : income_statement, 
                        'balance'  : balance_sheet,
                        'cash'     : cash_flow, 
-                       'CurrentP' : parse_page(stock, url, attrs)
-                       }
+                       'CurrentP' : parse_page(stock, url, attrs),
+                       'HistoricP': parse_page(stock, **kw)
+                      }
     return fin_data
 
 # Making the parent directory point to our financial data folder
@@ -103,7 +104,8 @@ def write_csv(path, file_name, data):
             These are the kwargs passed into wb.DataReader
 '''
 
-def parse_page(stock, *args):
+def parse_page(stock, *args, **kw):
+    df = pd.DataFrame()
     if len(args) == 2:
         url, attrs = args
         # There are no buttons I need to press on this page so no need for selenium
@@ -153,6 +155,8 @@ def parse_page(stock, *args):
         # Of my dictionary, therefore I just used those values
         df = pd.DataFrame.from_dict(temp, orient='index', columns=cols)
         driver.close()
+    else:
+        df = wb.DataReader(stock, **kw)
     return df     
 
 
