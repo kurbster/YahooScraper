@@ -25,7 +25,7 @@ web_attrs = {'stock_key' : '?p='}
 
 # This is the different type of data we want to get
 # And below are the stocks we want to get
-tickers = ['WMT', 'TSLA', 'MRNA', 'BRK-A']
+tickers = ['BRK-A']
 
 '''
     This dictionary will map a stocks name to another dictionary
@@ -37,9 +37,17 @@ tickers = ['WMT', 'TSLA', 'MRNA', 'BRK-A']
                                     'historic' : pd.DataFrame,
                                     'current'  : pd.DataFrame}}
 '''
-financial_data = {}
 
-for t in tickers:
-    financial_data[t] = scraper.get_fin_data(base_url, web_attrs, t,
-                                             data_source='yahoo', start='2018-1-1')
-    
+'''
+    pages is a dictionary that maps the user level name to the actual name of
+    The page containing that data. When you pass this into get_data it will
+    Iterate through each page and get the data for that based on the base_url
+    And web attributes
+'''
+pages = {'income' : 'financials', 'balance' : 'balance-sheet',
+         'cash'   : 'cash-flow', 'key-stats': 'key-statistics'}
+
+financial_data = {t : scraper.get_data(base_url, web_attrs, t,
+                                       data_source='yahoo', start='2018-1-1') 
+                  for t in tickers}
+

@@ -13,43 +13,45 @@ from bs4 import BeautifulSoup
 from pandas_datareader import data as wb
 
 '''
-    get_fin_data will get the financial data for the specific stock passed in
-    First it will get all of the historic financial data right now that means 
-    Income statement, balance sheet, and cash flow statement.
-        
-        To save time everytime I read a page from yahoo finance I save
-        The resulting DataFrame to a csv. Then if the csv exists I just read
-        That instead of creating a new selenium driver object.
+    get_data is a function that will take in either 0, 3, or 4 arguments
+        If it is passed 0 then kwargs must be set and we are only getting 
+            historical data
+        If it is passed 3 then we are getting the current price summary of
+            that particular stock
+        If it is passed 4 then we are getting data from financial pages
+            which is the extra argument passed in
+    E.X
+        get_data(url, web_attrs, AAPL) -> get current stock price of AAPL
+        get_data(url, web_attrs, pages, AAPL) -> get financial data for 
+                every page in the pages variable
+        get_data(data_source='yahoo', 'start'='2008-1-1') -> get the historical
+                data for this stock with these kwargs
+                
+    NOTE
+        The method will return the price summary every time unless you set
+            get_price=False
+        It will also return the historical if kw is set no matter what *args is
 '''
 
-def get_fin_data(url, attrs, stock, **kw):
-    fin_data = {}
-    # TODO maybe take in a list of pages you want to get
-    # i.e data = [financials, balance-sheet, cash-flow] then iterate through that
-    
-    # If the path wasn't created then just read the csv
-    path = create_folder(stock)
-    if not path:
-        income_statement = read_csv(stock, 'income.csv')
-        balance_sheet    = read_csv(stock, 'balance.csv')
-        cash_flow        = read_csv(stock, 'cash.csv')
-    else:
-        #Here I have to pass in the specific page I want to parse
-        income_statement = parse_page(stock, url, attrs, 'financials')
-        balance_sheet    = parse_page(stock, url, attrs, 'balance-sheet')
-        cash_flow        = parse_page(stock, url, attrs, 'cash-flow')
-        write_csv(path, 'income.csv',  income_statement)
-        write_csv(path, 'balance.csv', balance_sheet)
-        write_csv(path, 'cash.csv',    cash_flow)
-    
-    
-    fin_data[stock] = {'income'   : income_statement, 
-                       'balance'  : balance_sheet,
-                       'cash'     : cash_flow, 
-                       'CurrentP' : parse_page(stock, url, attrs),
-                       'HistoricP': parse_page(stock, **kw)
-                      }
-    return fin_data
+def get_data(*args, **kw):
+    data = {}
+    data['summary'] = parse_page(*args)
+    pages = kw.get('pages')
+    # If the pages kw was set we need to return the financial pages
+    if pages is not None:
+        # If a new folder wasn't created then just read the csv
+        path = create_folder(args[-1])
+        if not path:
+            fin_data = {name : read_csv(args[-1], name)
+                        for name in pages}
+            data.update(fin_data)
+        else:
+            fin_data = {name : parse_page(*args, key=page)
+                        for name, page in pages.items()}
+            write_files(path, fin_data)
+            data.update(fin_data)
+
+    return data
 
 # Making the parent directory point to our financial data folder
 parent = os.getcwd()
@@ -81,9 +83,11 @@ def read_csv(stock, file_name):
     return pd.read_csv(path)
 
 # Writes a pandas DataFrame to a csv file
-def write_csv(path, file_name, data):
-    path = os.path.join(path, file_name)
-    data.to_csv(path)
+def write_files(path, files):
+    for name, data in files.itmes():
+        file_name = name + '.csv'
+        path = os.path.join(path, file_name)
+        data.to_csv(path)
     
 '''
     parse_page will always take 1 argument and that is the stock name
@@ -104,17 +108,19 @@ def write_csv(path, file_name, data):
             These are the kwargs passed into wb.DataReader
 '''
 
-def parse_page(stock, *args, **kw):
+def parse_page(*args, **kw):
     df = pd.DataFrame()
-    if len(args) == 2:
-        url, attrs = args
+    url, attrs, stock = args
+    # kw is empty that means we only want to parse the summary page
+    if kw == {}:
         # There are no buttons I need to press on this page so no need for selenium
         page = requests.get(url + stock + attrs['stock_key'] + stock)
         soup = BeautifulSoup(page.content, 'html.parser')
         table = soup.find_all('table')
         df = pd.read_html(str(table))
-    elif len(args) == 3:
-        url, attrs, key = args
+        
+    elif kw.get('page') is not None:
+        url, attrs, stock, key = args
         # Then I get the driver object and the data table
         driver = webdriver.Chrome('C:\\Users\\karby\\Desktop\\Python Files\\ChromeDriver\\chromedriver')
         driver.get(url + stock + '/' + key + attrs['stock_key'] + stock)
@@ -133,24 +139,13 @@ def parse_page(stock, *args, **kw):
         names = tabl.find_all('span', class_='Va(m)')
        
         # These are the lists and dictionary I will use to create my pd DataFrame
-        temp = {}
         rows = [n.text for n in names]      # Names of the data we're taking
         cols = [c.text for c in columns]    # Names of the columns
         # I pop the first value from this list because it is just a placeholder and I dont need it
         cols.pop(0)
-        
-        # Data represents that numbers we are taking in. I am using enumerate
-        # Here so I can turn the data into a 2D array and have the corresponding
-        # Row names for that data
-        for i,d in enumerate(data):
-            row_num = i // len(cols)
-            # If this is the first entry in a row we have to make the list
-            if i % len(cols) == 0:
-                temp[rows[row_num]] = [d.text]
-                # Otherwise I append the value to the list
-            else:
-                temp[rows[row_num]].append(d.text)
-        
+        # This dictionary maps the row names to the data in that row using
+        temp = {rows[i // len(cols)] : d.text for i, d in enumerate(data)}
+
         # The orient (or rows) of my data is stored in the key (or index)
         # Of my dictionary, therefore I just used those values
         df = pd.DataFrame.from_dict(temp, orient='index', columns=cols)
