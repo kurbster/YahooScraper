@@ -14,30 +14,49 @@ from bs4 import BeautifulSoup
 from pandas_datareader import data as wb
 
 '''
-    get_data is a function that will always return the price of a stock
-        NOTE: As of Version 1.2 that means just using yahoo's summary page
-    Therefore get_data
+    get_data is a function that will return data specified by args and kwargs 
+        The only possible args this function can take are:
+                base_url  = url
+                web_attrs = attrs
+        These args must be specified if we are going to get data from yahoo
+    
+    IF there are no args specified
+        Then you want to get the historic data because this uses a built-in
+        pandas_datareader method so we don't need the internet
+        
+        E.X of this call
+            get_data('AAPL', data_source='yahoo', start='2018-1-1')
+                    These kwargs are required for the pandas method
+                    
+    IF args has any values then we will get the current price of that stock
+                    
+    IF the pages kwarg is set then I loop through the pages I want get the DF
+        If pages was set then I remove it from kwargs because I don't want
+        To pass that to pandas_datareader
+        
+    Therefore is any more kwargs are set we want to get the historical data
 '''
 
-def get_data(*args, **kw):
+def get_data(stock, *args, **kw):
     data = {}
-    data['Price'] = parse_page(*args)
-    pages = kw['pages']
+    if args:
+        data['Price'] = parse_page(stock, *args)
+    pages = kw.get('pages')
     # If the pages kw was set we need to return the financial pages
     if pages is not None:
         del kw['pages']
         # If a new folder wasn't created then just read the csv
-        path = create_folder(args[-1])
+        path = create_folder(stock)
         if not path:
             for page in pages:
-                data[page] = read_file(args[-1], page)
+                data[page] = read_file(stock, page)
         else:
-            fin_data = {name : parse_page(*args, key=page)
+            fin_data = {name : parse_page(stock, *args, key=page)
                         for name, page in pages.items()}
             write_files(path, fin_data)
             data.update(fin_data)
     if kw:
-        data['Historic'] = parse_page(*args, hist=kw)
+        data['Historic'] = parse_page(stock, hist=kw)
     return data
 
 # Making the parent directory point to our financial data folder
@@ -74,28 +93,26 @@ def write_files(path, files, ext='.csv'):
     
 '''
     parse_page will always take 1 argument and that is the stock name
-    Then it will either take 2 extra arguments (url, attrs)
-                         OR  3 extra arguments (url, attrs, key)
-                         OR  only keyword arguments
-    3 arguments means that I am taking the summary data
-    4 arguments means that I am taking specific financial data
+    Then it will take 2 extra arguments (url, attrs)
+                  OR  0 extra arguments
+            IF there are 0 args then we are just using pandas_datareader
+            Therefore I don't set the url or attrs
+   
+    IF there are no kwargs set then we need to return the current price 
     
-    Only keword arguments that can tells the method that we want to find
-    The historical price data for a stock. Therefore I can us pandas_datareader
-    And there is no need to pass in a url or any web attributes
+    IF the kwarg, key, was set then we need to get the page with that key
     
-            The specific keywords that can be passed in are:
-                start=''
-                end=''
-                data_source='yahoo'
-            These are the kwargs passed into wb.DataReader
+    IF the hist kwarg was set then we need to get the historical data
 '''
 
-def parse_page(*args, **kw):
-    url, attrs, stock = args
+def parse_page(stock, *args, **kw):
+    # If args is empty then we are getting the hist data. Otherwise we need
+    # To get the url and web attributes
+    if args != ():
+        url, attrs = args
     key = kw.get('key')
     hist = kw.get('hist')
-    # kw is empty that means we only want to parse the summary page
+    # If kw is empty that means we only want to parse the summary page
     if not kw:
         # There are no buttons I need to press on this page so no need for selenium
         page = requests.get(url + stock + attrs['stock_key'] + stock)
@@ -135,7 +152,8 @@ def parse_by_table(page, singular=False):
     return df
 
 '''
-    
+    parse_by_attributes will parse our yahoo pages that store their data in
+    A div element. Therefore there had to be some finessing to get the data 
 '''
 
 def parse_by_attributes(page):
@@ -156,7 +174,7 @@ def parse_by_attributes(page):
     cols = [c.text for c in columns]    # Names of the columns
     # I pop the first value from this list because it is just a placeholder and I dont need it
     cols.pop(0)
-    # This dictionary maps the row names to the data in that row using
+    # This is a list of all the data that I reshape so I can create my DF
     temp = np.reshape([d.text for d in data], (len(rows), len(cols)))
     # The orient (or rows) of my data is stored in the key (or index)
     # Of my dictionary, therefore I just used those values

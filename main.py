@@ -49,8 +49,8 @@ tickers = ['BRK-A', 'GOOG', 'TSLA']
 pages = {'Income'      : 'financials',  'Balance' : 'balance-sheet',
          'Cash Flow'   : 'cash-flow', 'Key Stats' : 'key-statistics'}
 
-financial_data = {t : scraper.get_data(base_url, web_attrs, t,
+financial_data = {t : scraper.get_data(t, base_url, web_attrs,
                                        pages=pages,
-                                       data_source='yahoo', start='2018-1-1') 
+                                       data_source='yahoo', start='2018-1-1')
                   for t in tickers}
 
