@@ -36,7 +36,7 @@ tickers = ['BRK-A', 'GOOG', 'TSLA', 'WMT', 'FB', 'AAPL']
                                     'Cash'     : pd.DataFrame,
                                     'Historic' : pd.DataFrame,
                                     'Key Stats': pd.DataFrame,
-                                    'Price     :[pd.DataFrame]'}}
+                                    'Summary   :[pd.DataFrame]'}}
 '''
 
 '''
@@ -50,7 +50,7 @@ pages = {'Income'      : 'financials',  'Balance' : 'balance-sheet',
          'Cash Flow'   : 'cash-flow', 'Key Stats' : 'key-statistics'}
 
 financial_data = {t : scraper.get_data(t, base_url, web_attrs,
-                                       pages=pages,
-                                       data_source='yahoo', start='2018-1-1')
+                                        pages=pages,
+                                        data_source='yahoo', start='2018-1-1',
+                                        interval=1, points=10)
                   for t in tickers}
-

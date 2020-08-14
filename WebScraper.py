@@ -12,6 +12,7 @@ import numpy as np
 from selenium import webdriver
 from bs4 import BeautifulSoup
 from pandas_datareader import data as wb
+from time import sleep
 
 '''
     get_data is a function that will return data specified by args and kwargs 
@@ -40,11 +41,10 @@ from pandas_datareader import data as wb
 def get_data(stock, *args, **kw):
     data = {}
     if args:
-        data['Price'] = parse_page(stock, *args)
+        data['Summary'] = parse_page(stock, *args)
     pages = kw.get('pages')
     # If the pages kw was set we need to return the financial pages
     if pages is not None:
-        del kw['pages']
         # If a new folder wasn't created then just read the csv
         path = create_folder(stock)
         if not path:
@@ -55,7 +55,9 @@ def get_data(stock, *args, **kw):
                         for name, page in pages.items()}
             write_files(path, fin_data)
             data.update(fin_data)
-    if kw:
+    hist_keys = ['data_source', 'start', 'end']
+    hist = {key : kw.get(key) for key in kw if key in hist_keys}
+    if hist:
         data['Historic'] = parse_page(stock, hist=kw)
     return data
 
@@ -140,6 +142,19 @@ def parse_page(stock, *args, **kw):
         return wb.DataReader(stock, **hist)  
 
 
+def parse_price(stock, *args):
+    price_list = []
+    for i in range(10):
+        url, attrs = args
+        page = requests.get(url + stock + attrs['stock_key'] + stock)
+        soup = BeautifulSoup(page.content, 'html.parser')
+        price = soup.find('span', {'data-reactid' : '50'})
+        print(price.string)
+        price_list.append(price.string)
+        sleep(1)
+    return price_list
+    
+    
 '''
     parse_by_table is used when the page were parsing uses the <table> element
     Therefore we don't need any selenium objects because the data is right 
