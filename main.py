@@ -25,17 +25,18 @@ web_attrs = {'stock_key' : '?p='}
 
 # This is the different type of data we want to get
 # And below are the stocks we want to get
-tickers = ['BRK-A']
+tickers = ['BRK-A', 'GOOG', 'TSLA']
 
 '''
     This dictionary will map a stocks name to another dictionary
     That dictionary maps the name of a dataframe then that DF
     e.x
-        financial_data = {'AAPL' : {'income'   : pd.DataFrame,
-                                    'balance'  : pd.DataFrame,
-                                    'cash'     : pd.DataFrame,
-                                    'historic' : pd.DataFrame,
-                                    'current'  : pd.DataFrame}}
+        financial_data = {'AAPL' : {'Income'   : pd.DataFrame,
+                                    'Balance'  : pd.DataFrame,
+                                    'Cash'     : pd.DataFrame,
+                                    'Historic' : pd.DataFrame,
+                                    'Key Stats': pd.DataFrame,
+                                    'Price     :[pd.DataFrame]'}}
 '''
 
 '''
@@ -44,10 +45,12 @@ tickers = ['BRK-A']
     Iterate through each page and get the data for that based on the base_url
     And web attributes
 '''
-pages = {'income' : 'financials', 'balance' : 'balance-sheet',
-         'cash'   : 'cash-flow', 'key-stats': 'key-statistics'}
+
+pages = {'Income'      : 'financials',  'Balance' : 'balance-sheet',
+         'Cash Flow'   : 'cash-flow', 'Key Stats' : 'key-statistics'}
 
 financial_data = {t : scraper.get_data(base_url, web_attrs, t,
+                                       pages=pages,
                                        data_source='yahoo', start='2018-1-1') 
                   for t in tickers}
 
