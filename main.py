@@ -25,7 +25,7 @@ web_attrs = {'stock_key' : '?p='}
 
 # This is the different type of data we want to get
 # And below are the stocks we want to get
-tickers = ['BRK-A', 'GOOG', 'TSLA']
+tickers = ['BRK-A', 'GOOG', 'TSLA', 'WMT', 'FB', 'AAPL']
 
 '''
     This dictionary will map a stocks name to another dictionary
