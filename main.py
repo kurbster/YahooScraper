@@ -25,7 +25,7 @@ web_attrs = {'stock_key' : '?p='}
 
 # This is the different type of data we want to get
 # And below are the stocks we want to get
-tickers = ['BRK-A', 'GOOG', 'TSLA', 'WMT', 'FB', 'AAPL']
+tickers = ['F']
 
 '''
     This dictionary will map a stocks name to another dictionary
@@ -45,12 +45,15 @@ tickers = ['BRK-A', 'GOOG', 'TSLA', 'WMT', 'FB', 'AAPL']
     Iterate through each page and get the data for that based on the base_url
     And web attributes
 '''
-
-pages = {'Income'      : 'financials',  'Balance' : 'balance-sheet',
+'''
+    'Income'      : 'financials',  'Balance' : 'balance-sheet',
+         'Cash Flow'   : 'cash-flow'
+'''
+pages = { 'Income'      : 'financials',  'Balance' : 'balance-sheet',
          'Cash Flow'   : 'cash-flow', 'Key Stats' : 'key-statistics'}
 
 financial_data = {t : scraper.get_data(t, base_url, web_attrs,
                                         pages=pages,
                                         data_source='yahoo', start='2018-1-1',
-                                        interval=1, points=10)
+                                        frequency=1, interval=10)
                   for t in tickers}
