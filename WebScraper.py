@@ -7,7 +7,6 @@ Created on Tue Aug  4 13:37:46 2020
 
 import os
 import requests
-import re
 import pandas as pd
 import numpy as np
 from selenium import webdriver
@@ -39,13 +38,23 @@ from time import sleep
     Therefore is any more kwargs are set we want to get the historical data
 '''
 
-def get_data(stock, *args, **kw):
+
+def clean_data(func):
+    def wrapper(stock, *args, **kw):
+        X = lambda keys, kws: {k : v for k, v in kws.items() if k in keys}
+        hist = X(['data_source', 'start', 'end'], kw)
+        price = X(['frequency', 'inverval'], kw)
+        pages = kw.get('pages')
+        return func(stock, hist, price, pages, *args)
+    return wrapper
+
+@clean_data
+def get_data(stock, hist, price, pages, *args):
     data = {}
     if args:
         data['Summary'] = parse_page(stock, *args)
-    pages = kw.get('pages')
     # If the pages kw was set we need to return the financial pages
-    if pages is not None:
+    if pages:
         # If a new folder wasn't created then just read the csv
         path = create_folder(stock)
         if not path:
@@ -59,16 +68,11 @@ def get_data(stock, *args, **kw):
     
     # These are all of the possible kw args I will pass into the parse page
     # Function, which in this case will ultimately call the DataReader method
-    hist_keys = ['data_source', 'start', 'end']
-    hist = {key : kw.get(key) for key in kw if key in hist_keys}
     if hist:
         data['Historic'] = parse_page(stock, **hist)
-    
-    price_keys = ['frequency', 'interval']
-    price = {key : kw.get(key) for key in kw if key in price_keys}
+
     if price:
         data['Price'] = parse_page(stock, *args, **price)
-        
     return data
 
 # Making the parent directory point to our financial data folder
@@ -131,7 +135,6 @@ def parse_page(stock, *args, **kw):
             # There are no buttons I need to press on this page so no need for selenium
             page = requests.get(url + stock + attrs['stock_key'] + stock)
             return parse_by_table(page)
-         
         # If key is not None then we need to parse a specific financial page
         if key:
             page = requests.get(url + stock + '/' + key + attrs['stock_key'] + stock)
@@ -156,10 +159,17 @@ def parse_page(stock, *args, **kw):
                 driver.close()
             
             return data
-          
-'''
+        
+        # If nothing else has returned this function then we are getting the current price
+        else:
+            page = requests.get(url + stock + attrs['stock_key'] + stock)
+            soup = BeautifulSoup(page.content, 'html.parser')
+            data = parse_by_attributes(soup,
+                                       cols=[[[stock]]], 
+                                       rows={BeautifulSoup.find : {'soup' : ('span', {'data-reactid' : '53'})}},
+                                       data={BeautifulSoup.find : {'soup' : ('span', {'data-reactid' : '50'})}})
+            return data
 
-'''
 
     
 def parse_by_attributes(soup, **kw):
@@ -167,44 +177,48 @@ def parse_by_attributes(soup, **kw):
     soup_elements = {name : [func(soup, name=args[0], attrs=args[1])
                     for func, args in path.items()]
                     for name, path in kw.items() if name not in attrs}
+    soup_elements['soup'] = [soup]
     
     data_elements = {name : [[func(soup_elements[obj][0], name=attrs)  
                                       if type(attrs) is str
                                       else func(soup_elements[obj][0], name=attrs[0], attrs=attrs[1])
                               for obj, attrs in args.items()]
                               for func, args in path.items()]
-                              for name, path in kw.items() if name in attrs}
-
+                              for name, path in kw.items() if name in attrs
+                              if type(path) is dict}
+    for attr in attrs:
+        if attr not in data_elements:
+            data_elements[attr] = kw.get(attr)
     return create_DF(**data_elements)    
+   
+    
     
 def create_DF(**kw):
-    row_vals = [[[r.text for r in rows]
-                     for rows in entry]
-                     for entry in kw.get('rows')]
-    col_vals = [[[c.text for c in columns]
-                     for columns in entry]
-                     for entry in kw.get('cols')]
-    data_vals = [[[d.text for d in data]
-                     for data in entry]
-                     for entry in kw.get('data')]
-    
+    try:
+        row_vals = [[[r.text for r in rows]
+                         for rows in entry]
+                         for entry in kw.get('rows')]
+        col_vals = [[[c.text for c in columns]
+                         for columns in entry]
+                         for entry in kw.get('cols')]
+        data_vals = [[[d.text for d in data]
+                         for data in entry]
+                         for entry in kw.get('data')]
+    except AttributeError:
+        row_vals = [[[r  for r in rows]
+                         for rows in entry]
+                         for entry in kw.get('rows')]
+        col_vals = [[[c  for c in columns]
+                         for columns in entry]
+                         for entry in kw.get('cols')]
+        data_vals = [[[d for d in data]
+                         for data in entry]
+                         for entry in kw.get('data')]
+        
     rows, cols, temp = row_vals[0][0], col_vals[0][0], data_vals[0][0]
     data = np.reshape(temp, (len(rows), len(cols)))
     return pd.DataFrame(data, index=rows, columns=cols)
 
-
-def parse_price(stock, *args):
-    price_list = []
-    for i in range(10):
-        url, attrs = args
-        page = requests.get(url + stock + attrs['stock_key'] + stock)
-        soup = BeautifulSoup(page.content, 'html.parser')
-        price = soup.find('span', {'data-reactid' : '50'})
-        print(price.string)
-        price_list.append(price.string)
-        sleep(1)
-    return price_list
-    
     
 '''
     parse_by_table is used when the page were parsing uses the <table> element
@@ -216,35 +230,6 @@ def parse_by_table(page, singular=False):
     table = soup.find_all('table') 
     df = pd.read_html(str(table))[0] if singular else pd.read_html(str(table))
     return df
-
-'''
-    parse_by_attributes will parse our yahoo pages that store their data in
-    A div element. Therefore there had to be some finessing to get the data 
-'''
-
-    
-# def parse_by_attributes(page):
-#     # Once all of the buttons are pushed I can parse the page
-#     soup = BeautifulSoup(page, 'html.parser')
-    
-#     # This gives me the top of the table so I can find the column names
-#     tabl_info = soup.find('div', class_='D(tbr)')
-#     columns = tabl_info.find_all('div', class_='Ta(c)')
-    
-#     # This gives me the data table
-#     tabl = soup.find('div', class_='D(tbrg)')
-#     data = tabl.find_all('div', {'data-test' : 'fin-col'})
-#     names = tabl.find_all('span', class_='Va(m)')
-       
-#     # These are the lists and dictionary I will use to create my pd DataFrame
-#     rows = [n.text for n in names]      # Names of the data we're taking
-#     cols = [c.text for c in columns]    # Names of the columns
-#     # This is a list of all the data that I reshape so I can create my DF
-#     temp = np.reshape([d.text for d in data], (len(rows), len(cols)))
-#     # The orient (or rows) of my data is stored in the key (or index)
-#     # Of my dictionary, therefore I just used those values
-#     df = pd.DataFrame(temp, index=rows, columns=cols)
-#     return df
 
 
 def click_buttons(element):
