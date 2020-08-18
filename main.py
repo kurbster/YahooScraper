@@ -45,10 +45,7 @@ tickers = ['F']
     Iterate through each page and get the data for that based on the base_url
     And web attributes
 '''
-'''
-    'Income'      : 'financials',  'Balance' : 'balance-sheet',
-         'Cash Flow'   : 'cash-flow'
-'''
+
 pages = { 'Income'      : 'financials',  'Balance' : 'balance-sheet',
          'Cash Flow'   : 'cash-flow', 'Key Stats' : 'key-statistics'}
 

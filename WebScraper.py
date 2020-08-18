@@ -7,7 +7,9 @@ Created on Tue Aug  4 13:37:46 2020
 
 import os
 import requests
+import re
 import pandas as pd
+import numpy as np
 from selenium import webdriver
 from bs4 import BeautifulSoup
 from pandas_datareader import data as wb
@@ -144,64 +146,51 @@ def parse_page(stock, *args, **kw):
                 table = driver.find_element_by_xpath('//*[@id="Col1-1-Financials-Proxy"]/section/div[4]/div[1]/div[1]/div[2]')
                 click_buttons(table)
                 soup = BeautifulSoup(driver.page_source, 'html.parser')
-                data = parse_by_attributes(soup,
+                data = parse_by_attributes(soup, 
                                       tabl_info={BeautifulSoup.find : ('div', {'class' : 'D(tbr)'})},
                                            tabl={BeautifulSoup.find : ('div', {'class' : 'D(tbrg)'})},
-                                           
-                                           )
+                                           cols={BeautifulSoup.find_all : {'tabl_info' : ('div' , {'class' : 'Ta(c)'})}},
+                                           rows={BeautifulSoup.find_all : {'tabl'      : ('span', {'class' : 'Va(m)'})}},
+                                           data={BeautifulSoup.find_all : {'tabl'      : ('div' , {'data-test' : 'fin-col'})}})
+                                      
                 driver.close()
             
             return data
           
 '''
-cols={BeautifulSoup.find_all : {'tabl_info' : 'span'}},
-                                           rows={BeautifulSoup.find_all : {'tabl' : 'span'}},
-                                           data={BeautifulSoup.find_all : {'tabl' : ('div', {'data-test' : 'fin-col'})}}
+
 '''
 
+    
 def parse_by_attributes(soup, **kw):
-    attrs = ['rows', 'cols', 'data']
-    soup_elements = {name : {func(*args)
-                    for func, args in path.items()}
+    attrs = ['cols', 'rows', 'data']
+    soup_elements = {name : [func(soup, name=args[0], attrs=args[1])
+                    for func, args in path.items()]
                     for name, path in kw.items() if name not in attrs}
     
-    print(soup_elements)
-    # soup_elements = {name : soup.func(args)
-    #                   for func, args  in route.items()
-    #                   for name, route in kw.items()}
-    
-    
-    # data_elements = {name : soup_elements[key].func(args)
-    #                   for name, route in kw.items 
-    #                   for func, value in route.items()
-    #                   for key , args  in value.items() if name in attrs}
-    # print(data_elements)
-    
+    data_elements = {name : [[func(soup_elements[obj][0], name=attrs)  
+                                      if type(attrs) is str
+                                      else func(soup_elements[obj][0], name=attrs[0], attrs=attrs[1])
+                              for obj, attrs in args.items()]
+                              for func, args in path.items()]
+                              for name, path in kw.items() if name in attrs}
 
-            
-       
-    
-    # # This will create a dictionary will map the name of the soup object
-    # # To the soup object. These objects are created using find
-    # find_list = {name : soup.find(path[0], path[1]) for name, path in kw.items()
-    #                                                 if name not in args}
-    
-    # # Then this dictionary will map the specific data we need for pd.DataFrame
-    # # Which I had to use 2 for loops here because not every argument passed in is a tuple
-    # data_dict = {name : (find_list[element].find_all(attr[0], attr[1]) 
-    #                       if type(attr) is tuple else find_list[element].find_all(attr))
-    #               for name, path in kw.items() if name in args
-    #               for element, attr in path.items()
-    #               }
-
-    # df = create_DF(**data_dict)
-    # return df     
+    return create_DF(**data_elements)    
     
 def create_DF(**kw):
-    rows = kw.get('rows')
-    cols = kw.get('cols')
-    data = kw.get('data')
-    pass
+    row_vals = [[[r.text for r in rows]
+                     for rows in entry]
+                     for entry in kw.get('rows')]
+    col_vals = [[[c.text for c in columns]
+                     for columns in entry]
+                     for entry in kw.get('cols')]
+    data_vals = [[[d.text for d in data]
+                     for data in entry]
+                     for entry in kw.get('data')]
+    
+    rows, cols, temp = row_vals[0][0], col_vals[0][0], data_vals[0][0]
+    data = np.reshape(temp, (len(rows), len(cols)))
+    return pd.DataFrame(data, index=rows, columns=cols)
 
 
 def parse_price(stock, *args):
@@ -233,14 +222,15 @@ def parse_by_table(page, singular=False):
     A div element. Therefore there had to be some finessing to get the data 
 '''
 
+    
 # def parse_by_attributes(page):
 #     # Once all of the buttons are pushed I can parse the page
 #     soup = BeautifulSoup(page, 'html.parser')
     
 #     # This gives me the top of the table so I can find the column names
 #     tabl_info = soup.find('div', class_='D(tbr)')
-#     columns = tabl_info.find_all('span')
-        
+#     columns = tabl_info.find_all('div', class_='Ta(c)')
+    
 #     # This gives me the data table
 #     tabl = soup.find('div', class_='D(tbrg)')
 #     data = tabl.find_all('div', {'data-test' : 'fin-col'})
@@ -249,8 +239,6 @@ def parse_by_table(page, singular=False):
 #     # These are the lists and dictionary I will use to create my pd DataFrame
 #     rows = [n.text for n in names]      # Names of the data we're taking
 #     cols = [c.text for c in columns]    # Names of the columns
-#     # I pop the first value from this list because it is just a placeholder and I dont need it
-#     cols.pop(0)
 #     # This is a list of all the data that I reshape so I can create my DF
 #     temp = np.reshape([d.text for d in data], (len(rows), len(cols)))
 #     # The orient (or rows) of my data is stored in the key (or index)
