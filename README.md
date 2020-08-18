@@ -4,6 +4,7 @@ get_data function. Currently V2.0, I am just getting data from yahoo finance.
 
 
 I). Understanding the parameters of scraper.get_data:
+    
     1). The stock name, or t, has to be passed to this funciton
     
     2). base_url and web_attrs must be passed if you are doing anything
