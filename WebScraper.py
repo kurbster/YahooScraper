@@ -15,40 +15,42 @@ from pandas_datareader import data as wb
 from time import sleep
 
 '''
-    get_data is a function that will return data specified by args and kwargs 
-        The only possible args this function can take are:
-                base_url  = url
-                web_attrs = attrs
-        These args must be specified if we are going to get data from yahoo
-    
-    IF there are no args specified
-        Then you want to get the historic data because this uses a built-in
-        pandas_datareader method so we don't need the internet
-        
-        E.X of this call
-            get_data('AAPL', data_source='yahoo', start='2018-1-1')
-                    These kwargs are required for the pandas method
-                    
-    IF args has any values then we will get the current price of that stock
-                    
-    IF the pages kwarg is set then I loop through the pages I want get the DF
-        If pages was set then I remove it from kwargs because I don't want
-        To pass that to pandas_datareader
-        
-    Therefore is any more kwargs are set we want to get the historical data
+    get_kwargs is a decarator for our get_data function which basically 
+    Gets the specific input values from **kw and passes them into the function
 '''
 
 
-def clean_data(func):
+def get_kwargs(func):
     def wrapper(stock, *args, **kw):
         X = lambda keys, kws: {k : v for k, v in kws.items() if k in keys}
         hist = X(['data_source', 'start', 'end'], kw)
-        price = X(['frequency', 'inverval'], kw)
+        price = X(['frequency', 'interval'], kw)
         pages = kw.get('pages')
         return func(stock, hist, price, pages, *args)
     return wrapper
 
-@clean_data
+
+'''
+    get_data is a function that will return the data of a specific stock
+    To do this I make a dictionary then add the desired data based on the parameters.
+    Example of different parameters:
+        *args will always represent the url and web attributes. 
+        Therefore if args is set then we will call parse_page with no kwargs
+        Which will just parse the summary page.
+            'https://finance.yahoo.com/quote/AAPL?p=AAPL'
+        
+        
+        If the pages parameter is set then we must loop through that
+        Dictionary and either read the already existing .csv file or 
+        Read the data from the website using parse_page with key=page
+        
+        If the parameters hist or price are set then we call parse_page
+        With the specific **kwargs. Historic data does need *args because 
+        I use a built in pandas method and not requests/BeautifulSoup
+        
+'''
+
+@get_kwargs
 def get_data(stock, hist, price, pages, *args):
     data = {}
     if args:
@@ -114,11 +116,12 @@ def write_files(path, files, ext='.csv'):
             IF there are 0 args then we are just using pandas_datareader
             Therefore I don't set the url or attrs
    
-    IF there are no kwargs set then we need to return the current price 
+    IF there are no kwargs set then we need to return the summary page
     
     IF the kwarg, key, was set then we need to get the page with that key
     
-    IF the hist kwarg was set then we need to get the historical data
+    IF args was set and we haven't returned yet that means we called this function
+    Trying to return the current price over a certain interval every frequency seconds
 '''
 
 def parse_page(stock, *args, **kw):
@@ -161,17 +164,37 @@ def parse_page(stock, *args, **kw):
             return data
         
         # If nothing else has returned this function then we are getting the current price
+        # This will run interval amount of times, sleeping frequency seconds each time
         else:
-            page = requests.get(url + stock + attrs['stock_key'] + stock)
-            soup = BeautifulSoup(page.content, 'html.parser')
-            data = parse_by_attributes(soup,
+            data = pd.DataFrame()
+            for i in range(kw.get('interval')):
+                page = requests.get(url + stock + attrs['stock_key'] + stock)
+                soup = BeautifulSoup(page.content, 'html.parser')
+                # You have to pass stock here as a 3D list
+                data = data.append(parse_by_attributes(soup,
                                        cols=[[[stock]]], 
                                        rows={BeautifulSoup.find : {'soup' : ('span', {'data-reactid' : '53'})}},
-                                       data={BeautifulSoup.find : {'soup' : ('span', {'data-reactid' : '50'})}})
+                                       data={BeautifulSoup.find : {'soup' : ('span', {'data-reactid' : '50'})}}))
+                sleep(kw.get('frequency'))
             return data
 
 
+'''
+    parse_by_attributes is a function that will parse a page using BeautifulSoup
+    based on the kwargs that are passed in. 
+    NOTE: FOR THIS FUNCTION TO WORK YOU MUST PASS IN COLS, ROWS, AND DATA
+    This is because these elements are used to create the pd.DataFrame
     
+    The function works in 2 parts
+        1). First evaluate the elements that will not be used for pandas
+            and are there to help you find the elements that will. Therefore
+            I need to save the soup elements in a dictionary
+        
+        2). Second I evaluate the elements that will be used for pandas
+            Which I use the soup_element dictionary to help me use the right
+            soup object to call the soup function
+            
+'''    
 def parse_by_attributes(soup, **kw):
     attrs = ['cols', 'rows', 'data']
     soup_elements = {name : [func(soup, name=args[0], attrs=args[1])
@@ -186,6 +209,11 @@ def parse_by_attributes(soup, **kw):
                               for func, args in path.items()]
                               for name, path in kw.items() if name in attrs
                               if type(path) is dict}
+    
+    # If the user declared one of the data elements in stead of resolving it
+    # Through soup elements then the above loop wouldn't resolve it so I do it here
+    # NOTE: If you want to declare the data element then you must pass in a 3D list
+    # Because of the create_df method
     for attr in attrs:
         if attr not in data_elements:
             data_elements[attr] = kw.get(attr)
@@ -194,16 +222,13 @@ def parse_by_attributes(soup, **kw):
     
     
 def create_DF(**kw):
+    # If the values are soup elements then I need to call r.text
     try:
         row_vals = [[[r.text for r in rows]
                          for rows in entry]
                          for entry in kw.get('rows')]
-        col_vals = [[[c.text for c in columns]
-                         for columns in entry]
-                         for entry in kw.get('cols')]
-        data_vals = [[[d.text for d in data]
-                         for data in entry]
-                         for entry in kw.get('data')]
+        
+    # If I get this exception then the values are strings so I don't call .text
     except AttributeError:
         row_vals = [[[r  for r in rows]
                          for rows in entry]
@@ -214,7 +239,14 @@ def create_DF(**kw):
         data_vals = [[[d for d in data]
                          for data in entry]
                          for entry in kw.get('data')]
-        
+    else:
+        col_vals = [[[c.text for c in columns]
+                         for columns in entry]
+                         for entry in kw.get('cols')]
+        data_vals = [[[d.text for d in data]
+                         for data in entry]
+                         for entry in kw.get('data')]
+    
     rows, cols, temp = row_vals[0][0], col_vals[0][0], data_vals[0][0]
     data = np.reshape(temp, (len(rows), len(cols)))
     return pd.DataFrame(data, index=rows, columns=cols)
