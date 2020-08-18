@@ -34,6 +34,7 @@ II). Understanding the global variables in main.py:
 
 
 III). Understanding the financial_data dictionary:
+
     This dictionary will map a stocks name to another dictionary
     That dictionary maps the name of a dataframe then that DF
     e.x
@@ -47,6 +48,7 @@ III). Understanding the financial_data dictionary:
                  
                                     
 IV). Understanding the pages dictionary:
+
     pages is a dictionary that maps the user level name to the actual name of
     The page containing that data. When you pass this into get_data it will
     Iterate through each page and get the data for that based on the base_url
