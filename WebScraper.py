@@ -10,7 +10,7 @@ import requests
 import pandas as pd
 import numpy as np
 from selenium import webdriver
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from pandas_datareader import data as wb
 from time import sleep
 
@@ -170,11 +170,10 @@ def parse_page(stock, *args, **kw):
             for i in range(kw.get('interval')):
                 page = requests.get(url + stock + attrs['stock_key'] + stock)
                 soup = BeautifulSoup(page.content, 'html.parser')
-                # You have to pass stock here as a 3D list
-                data = data.append(parse_by_attributes(soup,
-                                       cols=[[[stock]]], 
-                                       rows={BeautifulSoup.find : {'soup' : ('span', {'data-reactid' : '53'})}},
-                                       data={BeautifulSoup.find : {'soup' : ('span', {'data-reactid' : '50'})}}))
+                data = data.append(parse_by_attributes(soup, cols=[stock],
+                                      tabl={BeautifulSoup.find : ('div', {'id' : 'quote-header-info'})},
+                                      rows={BeautifulSoup.find : {'soup'  : ('div', {'id' : 'quote-market-notice'})}},
+                                      data={BeautifulSoup.find : {'tabl'  : ('span', {'class' : 'Trsdu(0.3s) Fw(b) Fz(36px) Mb(-4px) D(ib)'})}}))
                 sleep(kw.get('frequency'))
             return data
 
@@ -210,47 +209,45 @@ def parse_by_attributes(soup, **kw):
                               for name, path in kw.items() if name in attrs
                               if type(path) is dict}
     
-    # If the user declared one of the data elements in stead of resolving it
-    # Through soup elements then the above loop wouldn't resolve it so I do it here
-    # NOTE: If you want to declare the data element then you must pass in a 3D list
-    # Because of the create_df method
+    # When I am getting the stock price I pass in the name of the stock
+    # Rather then a dictionary telling me how to get there
+    # Therefore the above for loop won't add it to our data_elements therefore I do
     for attr in attrs:
         if attr not in data_elements:
             data_elements[attr] = kw.get(attr)
     return create_DF(**data_elements)    
    
     
-    
+'''
+    create_DF is a funtion that takes in a dictionary that must have the keys
+            rows, cols, and data.
+    This function takes that dictionary and returns the associating DataFrame
+'''
 def create_DF(**kw):
-    # If the values are soup elements then I need to call r.text
-    try:
-        row_vals = [[[r.text for r in rows]
-                         for rows in entry]
-                         for entry in kw.get('rows')]
-        
-    # If I get this exception then the values are strings so I don't call .text
-    except AttributeError:
-        row_vals = [[[r  for r in rows]
-                         for rows in entry]
-                         for entry in kw.get('rows')]
-        col_vals = [[[c  for c in columns]
-                         for columns in entry]
-                         for entry in kw.get('cols')]
-        data_vals = [[[d for d in data]
-                         for data in entry]
-                         for entry in kw.get('data')]
-    else:
-        col_vals = [[[c.text for c in columns]
-                         for columns in entry]
-                         for entry in kw.get('cols')]
-        data_vals = [[[d.text for d in data]
-                         for data in entry]
-                         for entry in kw.get('data')]
-    
-    rows, cols, temp = row_vals[0][0], col_vals[0][0], data_vals[0][0]
-    data = np.reshape(temp, (len(rows), len(cols)))
-    return pd.DataFrame(data, index=rows, columns=cols)
+    rows = to_list(kw.get('rows'))
+    cols = to_list(kw.get('cols'))
+    data = to_list(kw.get('data'))
+    return pd.DataFrame(np.reshape(data, (len(rows), len(cols))), index=rows, columns=cols)
 
+
+'''
+    to_list is a funtion that takes in a list of objects and returns a single
+    Dimension list of type str. This function has 2 parts:
+        1). Recursively call this method until myList is a 1D list
+        2). Then check what type of data the list holds and perform the right action
+'''
+def to_list(myList):
+    # If the next dimension is also a list then recursively call this method
+    # Until we don't have anymore lists to go through
+    if isinstance(myList[0], list):
+        return to_list(myList[0])
+    else:
+        # If myList contains BeautifulSoup tags then we need to return
+        # The string attribute of each tag
+        if isinstance(myList[0], Tag):
+            return [e.string for e in myList]
+        else:
+            return myList
     
 '''
     parse_by_table is used when the page were parsing uses the <table> element
