@@ -16,7 +16,7 @@ web_attrs = {'stock_key' : '?p='}
 
 # This is the different type of data we want to get
 # And below are the stocks we want to get
-tickers = ['AAPL', 'GOOG', 'FB', 'NFLX', 'AMZN', 'WMT']
+tickers = ['AAPL', 'GOOG', 'CAT']
 
 
 pages = { 'Income'     : 'financials',  'Balance' : 'balance-sheet',

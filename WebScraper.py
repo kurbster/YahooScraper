@@ -78,8 +78,9 @@ def get_data(stock, hist, price, pages, *args):
     return data
 
 # Making the parent directory point to our financial data folder
-parent = os.getcwd()
-FIN_DIR = os.path.join(parent, 'Financial Data')
+parent  = os.getcwd()
+FIN_DIR = os.path.join(parent, 'Data')
+CHROME  = os.path.join(parent, 'ChromeDriver')
 
 def create_folder(stock):
     path = os.path.join(FIN_DIR, stock)
@@ -147,7 +148,7 @@ def parse_page(stock, *args, **kw):
             try:
                 data = parse_by_table(page, singular=True)
             except ValueError:
-                driver = webdriver.Chrome('C:\\Users\\karby\\Desktop\\Python Files\\ChromeDriver\\chromedriver')
+                driver = webdriver.Chrome(os.path.join(CHROME, 'chromedriver.exe'))
                 driver.get(url + stock + '/' + key + attrs['stock_key'] + stock)
                 table = driver.find_element_by_xpath('//*[@id="Col1-1-Financials-Proxy"]/section/div[4]/div[1]/div[1]/div[2]')
                 click_buttons(table)
