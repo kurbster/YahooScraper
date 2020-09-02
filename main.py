@@ -19,8 +19,8 @@ web_attrs = {'stock_key' : '?p='}
 tickers = ['AAPL', 'GOOG', 'CAT']
 
 
-pages = { 'Income'     : 'financials',  'Balance' : 'balance-sheet',
-         'Cash Flow'   : 'cash-flow', 'Key Stats' : 'key-statistics'}
+pages = {'income': 'financials',  'balance' : 'balance-sheet',
+         'Cash Flow'  : 'cash-flow', 'Key Stats' : 'key-statistics'}
 
 
 financial_data = {t : scraper.get_data(t, base_url, web_attrs,
@@ -28,5 +28,3 @@ financial_data = {t : scraper.get_data(t, base_url, web_attrs,
                                        data_source='yahoo', start='2018-1-1',
                                        frequency=1, interval=1)
                   for t in tickers}
-
-

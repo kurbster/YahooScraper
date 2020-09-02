@@ -10,6 +10,7 @@ import requests
 import pandas as pd
 import numpy as np
 from selenium import webdriver
+from webdriver_manager.firefox import GeckoDriverManager
 from bs4 import BeautifulSoup
 from pandas_datareader import data as wb
 from time import sleep
@@ -109,7 +110,7 @@ def read_file(stock, name, ext='.csv'):
 def write_files(path, files, ext='.csv'):
     for name, data in files.items():
         data.to_csv(os.path.join(path, name + ext))
-    
+
 '''
     parse_page will always take 1 argument and that is the stock name
     Then it will take 2 extra arguments (url, attrs)
@@ -148,7 +149,10 @@ def parse_page(stock, *args, **kw):
             try:
                 data = parse_by_table(page, singular=True)
             except ValueError:
-                driver = webdriver.Chrome(os.path.join(CHROME, 'chromedriver.exe'))
+                '''
+                    THERE IS STILL A PROBLEM HERE WITH THE SELENIUM OBJECT. IDK
+                '''
+                driver = webdriver.Firefox(executable_path=GeckoDriverManager().install())
                 driver.get(url + stock + '/' + key + attrs['stock_key'] + stock)
                 table = driver.find_element_by_xpath('//*[@id="Col1-1-Financials-Proxy"]/section/div[4]/div[1]/div[1]/div[2]')
                 click_buttons(table)
