@@ -269,11 +269,17 @@ def click_buttons(element):
         # I must catch the not found exception
         try:
             button = row.find_element_by_xpath('.//button')
+            '''
+            WIERD BUG IF YOU DON'T SLEEP BEFORE YOU CLICK
+            SOMETIMES IT WILL NOT CLICK THE FIRST BUTTON 
+            BUT WILL CLICK EVERYTHING ELSE
+            '''
+            sleep(.75)
+            button.click()
         except:
             pass
         # If a button was found I want to click it
         else:
-            button.click()
             # Then I must recursively call this function
             # So I can check if the new row (new_div) created has a button
             new_div = row.find_element_by_xpath('./div[2]')
