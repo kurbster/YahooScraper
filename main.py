@@ -24,19 +24,28 @@ pages = { 'Income'     : 'financials',  'Balance' : 'balance-sheet',
          'Cash Flow'   : 'cash-flow', 'Key Stats' : 'key-statistics'}
 
 
+<<<<<<< Updated upstream
 financial_data = {t : get_data(t, base_url, web_attrs,
                                        pages=pages,
 <<<<<<< Updated upstream
                                        frequency=1, interval=1)
+=======
+financial_data = {t : scraper.get_data(t, base_url, web_attrs,
+                                        pages=pages,
+                                        data_source='yahoo', start='2018-1-1',
+                                        frequency=1, interval=1)
+>>>>>>> Stashed changes
                   for t in tickers}
 
 # Currencies or anything that doesn't have the extra pages of data 
 # Need to be called in a different loop that doesn't set pages
 currencies = ['BTC-USD', 'GC=F']
 currency_data = {c : scraper.get_data(c, base_url, web_attrs,
-                                       frequency=1, interval=1)
+                                      data_source='yahoo', start='2018-1-1',
+                                      frequency=1, interval=1)
                   for c in currencies}
 
+<<<<<<< Updated upstream
 
 =======
                                        data_source='yahoo', start='2018-1-1')
@@ -64,4 +73,6 @@ indicators = {'MACD' : [{'slow':26,
 
 indicator_data = {t : get_financial_indicators(financial_data[t]['Historic'], **indicators)
                   for t in tickers}
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
