@@ -11,71 +11,8 @@ import pandas as pd
 import numpy as np
 from selenium import webdriver
 from bs4 import BeautifulSoup, Tag
-from pandas_datareader import data as wb
 from time import sleep
 
-'''
-    get_kwargs is a decarator for our get_data function which basically 
-    Gets the specific input values from **kw and passes them into the function
-'''
-
-
-def get_kwargs(func):
-    def wrapper(stock, *args, **kw):
-        X = lambda keys, kws: {k : v for k, v in kws.items() if k in keys}
-        hist = X(['data_source', 'start', 'end'], kw)
-        price = X(['frequency', 'interval'], kw)
-        pages = kw.get('pages')
-        return func(stock, hist, price, pages, *args)
-    return wrapper
-
-
-'''
-    get_data is a function that will return the data of a specific stock
-    To do this I make a dictionary then add the desired data based on the parameters.
-    Example of different parameters:
-        *args will always represent the url and web attributes. 
-        Therefore if args is set then we will call parse_page with no kwargs
-        Which will just parse the summary page.
-            'https://finance.yahoo.com/quote/AAPL?p=AAPL'
-        
-        
-        If the pages parameter is set then we must loop through that
-        Dictionary and either read the already existing .csv file or 
-        Read the data from the website using parse_page with key=page
-        
-        If the parameters hist or price are set then we call parse_page
-        With the specific **kwargs. Historic data does need *args because 
-        I use a built in pandas method and not requests/BeautifulSoup
-        
-'''
-
-@get_kwargs
-def get_data(stock, hist, price, pages, *args):
-    data = {}
-    if args:
-        data['Summary'] = parse_page(stock, *args)
-    # If the pages kw was set we need to return the financial pages
-    if pages:
-        # If a new folder wasn't created then just read the csv
-        path = create_folder(stock)
-        if not path:
-            for page in pages:
-                data[page] = read_file(stock, page)
-        else:
-            fin_data = {name : parse_page(stock, *args, key=page)
-                        for name, page in pages.items()}
-            write_files(path, fin_data)
-            data.update(fin_data)
-    
-    # These are all of the possible kw args I will pass into the parse page
-    # Function, which in this case will ultimately call the DataReader method
-    if hist:
-        data['Historic'] = parse_page(stock, **hist)
-
-    if price:
-        data['Price'] = parse_page(stock, *args, **price)
-    return data
 
 # Making the parent directory point to our financial data folder
 parent = os.getcwd()
@@ -108,92 +45,51 @@ def read_file(stock, name, ext='.csv'):
 def write_files(path, files, ext='.csv'):
     for name, data in files.items():
         data.to_csv(os.path.join(path, name + ext))
-    
-'''
-    parse_page will always take 1 argument and that is the stock name
-    Then it will take 2 extra arguments (url, attrs)
-                  OR  0 extra arguments
-            IF there are 0 args then we are just using pandas_datareader
-            Therefore I don't set the url or attrs
-   
-    IF there are no kwargs set then we need to return the summary page
-    
-    IF the kwarg, key, was set then we need to get the page with that key
-    
-    IF args was set and we haven't returned yet that means we called this function
-    Trying to return the current price over a certain interval every frequency seconds
-'''
 
-def parse_page(stock, *args, **kw):
-    # If args is not set then I am returning the historical data using the builin method
-    if not args:
-        return wb.DataReader(stock, **kw)
-   
-    # Otherwise I am parsing a page from the internet
+    
+def get_data(*args, stock=False, pages=False):
+    if not pages or not stock:
+        raise BaseException('You forgot to pass a variable to this function')
+    # If a new folder wasn't created then just read the csv
+    path = create_folder(stock)
+    if not path:
+        data = {page : read_file(stock, page) for page in pages}
     else:
-        url, attrs = args
-        key = kw.get('key')
-        # If kw is empty that means we only want to parse the summary page
-        if not kw:
-            # There are no buttons I need to press on this page so no need for selenium
-            page = requests.get(url + stock + attrs['stock_key'] + stock)
-            return parse_by_table(page)
-        # If key is not None then we need to parse a specific financial page
-        if key:
-            page = requests.get(url + stock + '/' + key + attrs['stock_key'] + stock)
-            # I first try to parse the page using the <table> element
-            # If the page doesn't have a table then the function will return
-            # A ValueError exception
-            try:
-                data = parse_by_table(page, singular=True)
-            except ValueError:
-                driver = webdriver.Chrome('C:\\Users\\karby\\Desktop\\Python Files\\ChromeDriver\\chromedriver')
-                driver.get(url + stock + '/' + key + attrs['stock_key'] + stock)
-                table = driver.find_element_by_xpath('//*[@id="Col1-1-Financials-Proxy"]/section/div[4]/div[1]/div[1]/div[2]')
-                click_buttons(table)
-                soup = BeautifulSoup(driver.page_source, 'html.parser')
-                data = parse_by_attributes(soup, 
+        data = {name : parse_page(stock, *args, key=page)
+                for name, page in pages.items()}
+        write_files(path, data)
+    return data
+        
+
+
+def parse_page(stock, *args, key=False):  
+    url, attrs = args
+    page = requests.get(url + stock + '/' + key + attrs['stock_key'] + stock)
+    # I first try to parse the page using the <table> element
+    # If the page doesn't have a table then the function will return
+    # A ValueError exception
+    try:
+        data = parse_by_table(page, singular=True)
+    except ValueError:
+        driver = webdriver.Chrome('C:\\Users\\karby\\Desktop\\Python Files\\ChromeDriver\\chromedriver')
+        driver.get(url + stock + '/' + key + attrs['stock_key'] + stock)
+        table = driver.find_element_by_xpath('//*[@id="Col1-1-Financials-Proxy"]/section/div[4]/div[1]/div[1]/div[2]')
+        click_buttons(table)
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        data = parse_by_attributes(soup, 
                                       tabl_info={BeautifulSoup.find : ('div', {'class' : 'D(tbr)'})},
                                            tabl={BeautifulSoup.find : ('div', {'class' : 'D(tbrg)'})},
                                            cols={BeautifulSoup.find_all : {'tabl_info' : ('div' , {'class' : 'Ta(c)'})}},
                                            rows={BeautifulSoup.find_all : {'tabl'      : ('span', {'class' : 'Va(m)'})}},
                                            data={BeautifulSoup.find_all : {'tabl'      : ('div' , {'data-test' : 'fin-col'})}})
                                       
-                driver.close()
+        driver.close()
             
-            return data
+    return data
         
-        # If nothing else has returned this function then we are getting the current price
-        # This will run interval amount of times, sleeping frequency seconds each time
-        else:
-            data = pd.DataFrame()
-            for i in range(kw.get('interval')):
-                page = requests.get(url + stock + attrs['stock_key'] + stock)
-                soup = BeautifulSoup(page.content, 'html.parser')
-                data = data.append(parse_by_attributes(soup, cols=[stock],
-                                      tabl={BeautifulSoup.find : ('div', {'id' : 'quote-header-info'})},
-                                      rows={BeautifulSoup.find : {'soup'  : ('div', {'id' : 'quote-market-notice'})}},
-                                      data={BeautifulSoup.find : {'tabl'  : ('span', {'class' : 'Trsdu(0.3s) Fw(b) Fz(36px) Mb(-4px) D(ib)'})}}))
-                sleep(kw.get('frequency'))
-            return data
 
 
-'''
-    parse_by_attributes is a function that will parse a page using BeautifulSoup
-    based on the kwargs that are passed in. 
-    NOTE: FOR THIS FUNCTION TO WORK YOU MUST PASS IN COLS, ROWS, AND DATA
-    This is because these elements are used to create the pd.DataFrame
-    
-    The function works in 2 parts
-        1). First evaluate the elements that will not be used for pandas
-            and are there to help you find the elements that will. Therefore
-            I need to save the soup elements in a dictionary
-        
-        2). Second I evaluate the elements that will be used for pandas
-            Which I use the soup_element dictionary to help me use the right
-            soup object to call the soup function
-            
-'''    
+
 def parse_by_attributes(soup, **kw):
     attrs = ['cols', 'rows', 'data']
     soup_elements = {name : [func(soup, name=args[0], attrs=args[1])
@@ -273,6 +169,15 @@ def click_buttons(element):
             WIERD BUG IF YOU DON'T SLEEP BEFORE YOU CLICK
             SOMETIMES IT WILL NOT CLICK THE FIRST BUTTON 
             BUT WILL CLICK EVERYTHING ELSE
+            
+            UPDATE:
+                This is because firefox is slower than chrome
+                And sometimes isnt loading the data fast enough
+                
+                Can someone eventually help with this? We only use this 
+                Code everytime we get a new stock so I don't think it
+                Really matters because we should only be invested in a few 
+                Stock and will already have that data saved
             '''
             sleep(.75)
             button.click()

@@ -5,8 +5,10 @@ Created on Tue Aug  4 13:18:41 2020
 @author: karby
 """
 
-from WebScraper import get_data
-from TechIndicators import get_financial_indicators
+import WebScraper as ws
+import TechIndicators as ti
+import DataPipeline as dp
+import Predictors
 
 '''
     The README explains what is going on in this file
@@ -24,31 +26,7 @@ pages = { 'Income'     : 'financials',  'Balance' : 'balance-sheet',
          'Cash Flow'   : 'cash-flow', 'Key Stats' : 'key-statistics'}
 
 
-<<<<<<< Updated upstream
-financial_data = {t : get_data(t, base_url, web_attrs,
-                                       pages=pages,
-<<<<<<< Updated upstream
-                                       frequency=1, interval=1)
-=======
-financial_data = {t : scraper.get_data(t, base_url, web_attrs,
-                                        pages=pages,
-                                        data_source='yahoo', start='2018-1-1',
-                                        frequency=1, interval=1)
->>>>>>> Stashed changes
-                  for t in tickers}
-
-# Currencies or anything that doesn't have the extra pages of data 
-# Need to be called in a different loop that doesn't set pages
-currencies = ['BTC-USD', 'GC=F']
-currency_data = {c : scraper.get_data(c, base_url, web_attrs,
-                                      data_source='yahoo', start='2018-1-1',
-                                      frequency=1, interval=1)
-                  for c in currencies}
-
-<<<<<<< Updated upstream
-
-=======
-                                       data_source='yahoo', start='2018-1-1')
+financial_data = {t : ws.get_data(base_url, web_attrs, pages=pages,stock=t)
                   for t in tickers}
 
 indicators = {'MACD' : [{'slow':26,
@@ -71,8 +49,12 @@ indicators = {'MACD' : [{'slow':26,
                         {'period':20}]
              }
 
-indicator_data = {t : get_financial_indicators(financial_data[t]['Historic'], **indicators)
-                  for t in tickers}
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
+#indicator_data = {t : ti.get_financial_indicators(financial_data[t]['Historic'], **indicators)
+ #                 for t in tickers}
+
+
+
+#for t in tickers:
+ #   dp.gen_price(base_url, web_attrs, t, dp.printer())
+#for t in tickers:
+
