@@ -7,7 +7,7 @@ Created on Sat Sep 12 20:38:42 2020
 
 import requests
 from bs4 import BeautifulSoup
-from WebScraper import parse_by_attributes
+import WebScraper as ws
 
 '''
     This is the decarator used to start our generators so we don't have to
@@ -30,7 +30,7 @@ def coroutine(func):
 def gen_price(url, attrs, stock, target):
     page  = requests.get(url + stock + attrs['stock_key'] + stock)
     soup  = BeautifulSoup(page.content, 'html.parser')
-    price = parse_by_attributes(soup, cols=[stock],
+    price = ws.parse_by_attributes(soup, cols=[stock],
                                               tabl={BeautifulSoup.find : ('div', {'id' : 'quote-header-info'})},
                                               rows={BeautifulSoup.find : {'soup'  : ('div', {'id' : 'quote-market-notice'})}},
                                               data={BeautifulSoup.find : {'tabl'  : ('span', {'class' : 'Trsdu(0.3s) Fw(b) Fz(36px) Mb(-4px) D(ib)'})}})
@@ -44,4 +44,11 @@ def printer():
             series = (yield)
             print(series)
     except GeneratorExit:
-        return
+        print('Done')
+        
+@coroutine
+def broadcaster(targets):
+    while True:
+        price = (yield)
+        for target in targets:
+            target.send(price)

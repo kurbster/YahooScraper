@@ -3,66 +3,52 @@
 Created on Tue Aug  4 13:37:46 2020
 
 @author: karby
+
+The webscraper class will return the data we get from yahoo finance but not
+The price. I am handling the price in the DataPipepline file. Here I am getting
+The misccellaneous data like balance sheet, income statement, etc. 
 """
 
-import os
 import requests
 import pandas as pd
-import numpy as np
+import FileManager as fm
 from selenium import webdriver
-from bs4 import BeautifulSoup, Tag
+from webdriver_manager.chrome import ChromeDriverManager
+from bs4 import BeautifulSoup
 from time import sleep
 
 
-# Making the parent directory point to our financial data folder
-parent = os.getcwd()
-FIN_DIR = os.path.join(parent, 'Financial Data')
+'''
+    This is the function that you will call from main.py or elsewhere in the program
+    You must pass it the base url and the web attributes for that url.
+    Also you must pass in the stock you want to get and the specific pages.
+    If either of these are empty you will get an exception
+'''
 
-def create_folder(stock):
-    path = os.path.join(FIN_DIR, stock)
-    # I try to make the folder to store the stock data in
-    try:
-        os.mkdir(path)
-        return path
-    # If my exception is the file exists then I return false b/c I did not
-    # Create a new file. Therefore the funciton that called this will know
-    # To read a csv file instead of creating one
-    except FileExistsError:
-        return False
-    # If I get a file not found error then the Financial Data directory
-    # Isn't set up on this computer. Therefore I have to make the directory
-    # Then recall the method so I can create the stock folder
-    except FileNotFoundError:
-        os.mkdir(FIN_DIR)
-        # I must return the value of path to the parent 
-        return create_folder(stock)
-
-def read_file(stock, name, ext='.csv'):
-    name += ext
-    path = os.path.join(FIN_DIR, stock)
-    return pd.read_csv(os.path.join(path, name))
-
-def write_files(path, files, ext='.csv'):
-    for name, data in files.items():
-        data.to_csv(os.path.join(path, name + ext))
-
-    
 def get_data(*args, stock=False, pages=False):
     if not pages or not stock:
-        raise BaseException('You forgot to pass a variable to this function')
+        raise BaseException('You forgot to pass a stock to this function' if not stock 
+                            else 'You forgot to pass pages to this function')
+    if len(args) != 2:
+        raise BaseException('You passed ' + str(len(args)) + ' arguments when you needed to pass 2')
     # If a new folder wasn't created then just read the csv
-    path = create_folder(stock)
+    path = fm.create_folder(stock)
     if not path:
-        data = {page : read_file(stock, page) for page in pages}
+        data = {page : fm.read_file(stock, page) for page in pages}
     else:
         data = {name : parse_page(stock, *args, key=page)
                 for name, page in pages.items()}
-        write_files(path, data)
+        fm.write_files(path, data)
+        
     return data
         
+'''
+    This function will make the request to the page and return the answer.
+    First it will try to use the build-in pandas method to parse the site.
+    If that fails then we have to use selenium to expand the entire table.
+'''
 
-
-def parse_page(stock, *args, key=False):  
+def parse_page(stock, *args, key=False):
     url, attrs = args
     page = requests.get(url + stock + '/' + key + attrs['stock_key'] + stock)
     # I first try to parse the page using the <table> element
@@ -71,7 +57,7 @@ def parse_page(stock, *args, key=False):
     try:
         data = parse_by_table(page, singular=True)
     except ValueError:
-        driver = webdriver.Chrome('C:\\Users\\karby\\Desktop\\Python Files\\ChromeDriver\\chromedriver')
+        driver = webdriver.Chrome(executable_path=ChromeDriverManager().install())
         driver.get(url + stock + '/' + key + attrs['stock_key'] + stock)
         table = driver.find_element_by_xpath('//*[@id="Col1-1-Financials-Proxy"]/section/div[4]/div[1]/div[1]/div[2]')
         click_buttons(table)
@@ -89,8 +75,14 @@ def parse_page(stock, *args, key=False):
         
 
 
+'''
+    This method will parse whatever is specified by kwargs. kw must include 
+    cols, rows, and data which will tell our soup object how to find each one
+    Then it will get the proper DF and return
+'''
 
 def parse_by_attributes(soup, **kw):
+    assert ('cols' in kw and 'rows' in kw and 'data' in kw), 'You must pass the 3 essential elements for making a DF'
     attrs = ['cols', 'rows', 'data']
     soup_elements = {name : [func(soup, name=args[0], attrs=args[1])
                     for func, args in path.items()]
@@ -111,39 +103,8 @@ def parse_by_attributes(soup, **kw):
     for attr in attrs:
         if attr not in data_elements:
             data_elements[attr] = kw.get(attr)
-    return create_DF(**data_elements)    
+    return fm.create_DF(**data_elements)    
    
-    
-'''
-    create_DF is a funtion that takes in a dictionary that must have the keys
-            rows, cols, and data.
-    This function takes that dictionary and returns the associating DataFrame
-'''
-def create_DF(**kw):
-    rows = to_list(kw.get('rows'))
-    cols = to_list(kw.get('cols'))
-    data = to_list(kw.get('data'))
-    return pd.DataFrame(np.reshape(data, (len(rows), len(cols))), index=rows, columns=cols)
-
-
-'''
-    to_list is a funtion that takes in a list of objects and returns a single
-    Dimension list of type str. This function has 2 parts:
-        1). Recursively call this method until myList is a 1D list
-        2). Then check what type of data the list holds and perform the right action
-'''
-def to_list(myList):
-    # If the next dimension is also a list then recursively call this method
-    # Until we don't have anymore lists to go through
-    if isinstance(myList[0], list):
-        return to_list(myList[0])
-    else:
-        # If myList contains BeautifulSoup tags then we need to return
-        # The string attribute of each tag
-        if isinstance(myList[0], Tag):
-            return [e.string for e in myList]
-        else:
-            return myList
     
 '''
     parse_by_table is used when the page were parsing uses the <table> element
@@ -165,21 +126,6 @@ def click_buttons(element):
         # I must catch the not found exception
         try:
             button = row.find_element_by_xpath('.//button')
-            '''
-            WIERD BUG IF YOU DON'T SLEEP BEFORE YOU CLICK
-            SOMETIMES IT WILL NOT CLICK THE FIRST BUTTON 
-            BUT WILL CLICK EVERYTHING ELSE
-            
-            UPDATE:
-                This is because firefox is slower than chrome
-                And sometimes isnt loading the data fast enough
-                
-                Can someone eventually help with this? We only use this 
-                Code everytime we get a new stock so I don't think it
-                Really matters because we should only be invested in a few 
-                Stock and will already have that data saved
-            '''
-            sleep(.75)
             button.click()
         except:
             pass
