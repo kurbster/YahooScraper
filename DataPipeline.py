@@ -7,8 +7,9 @@ Created on Sat Sep 12 20:38:42 2020
 
 import requests
 from bs4 import BeautifulSoup
+from pandas_datareader import data as wb
 import WebScraper as ws
-
+import TechIndicators as ti
 '''
     This is the decarator used to start our generators so we don't have to
 '''
@@ -52,3 +53,10 @@ def broadcaster(targets):
         price = (yield)
         for target in targets:
             target.send(price)
+
+def init_pipeline(data, indicators, tickers):
+    historic = {t : wb.DataReader(t, data_source='yahoo', start='01-01-2020')
+                for t in tickers}
+    indicators_init = {t : ti.get_indicators(stock=t, closes=historic[t]['Adj Close'], hi=historic[t]['High'], lo=historic[t]['Low'], indicators=indicators)
+                       for t in tickers}
+    return indicators_init

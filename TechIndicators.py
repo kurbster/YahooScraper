@@ -102,43 +102,20 @@ def MACD(closes, slow, fast, signal):
     results = results.dropna()
     return results
 
-class Indicators:
-    def __init__(self, sym, commands, start='01-01-2019'):    
-        self.stock = sym
-        self.historical = wb.DataReader(sym, data_source='yahoo', start=start)
-        
-        # Here I am remapping this indicators object to the indicator the user wanted
-        for func, kwarg in commands.items():
+def get_indicators(stock=False, closes=False, hi=False, lo=False, indicators=False):
+    indicator_data = {}
+    for func, args in indicators.items():
+        indicator_data[func] = []
+        for kwargs in args:
             if func == 'MACD':
-                self.macd = kwarg
+                indicator_data[func].append(MACD(closes, **kwargs))
             elif func == 'RSI':
-                self.rsi_data  = kwarg
+                indicator_data[func].append(RSI(closes, **kwargs))
             elif func == 'BB':
-                self.bb = kwarg
+                indicator_data[func].append(BB(closes, **kwargs))
             elif func == 'ATR':
-                self.atr = kwarg
-    
-    '''
-        TODO: Add setter methods so we can change what are analysis is.
-        Right now when you call the function it will use that indicator objects
-        Data.
-        
-        TODO: Finish pluging in the update generator so I can update the 
-        Indicators accordingly.
-    '''
-    def MACD(self, c):     return MACD(c  , **self.macd)
-    def RSI(self , c):     return RSI( c  , **self.rsi )
-    def BB(self  , c):     return BB(  c  , **self.bb  )
-    def ATR(self , c,h,l): return ATR(c,h,l **self.atr )
-    
-    def get(self):
-        return self.historical
-    
-    def update(self):
-        while True:
-            price = (yield)
-            '''
-            do stuff here
-            '''
-            
-    
+                indicator_data[func].append(ATR(closes, hi, lo, **kwargs))
+            else:
+                raise BaseException('We havent added that feature yet')
+
+    return indicator_data
