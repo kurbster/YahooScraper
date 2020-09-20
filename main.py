@@ -44,4 +44,6 @@ indicators = {'MACD' : {'slow':26,
 dp = DataPipeline.DataPipeline(financial_data, tickers, ind_args=indicators)
 for i in range(3):
     dp.gen_price(base_url, web_attrs, dp.broadcast([dp.update('TI',
+                                                    dp.printer()),
+                                                    dp.update('PRED',
                                                     dp.printer())]))

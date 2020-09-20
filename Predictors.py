@@ -38,7 +38,3 @@ class Predictors:
             plt.figure(figsize=(10,6))
             plt.title(t)
             plt.plot(priceList)
-            
-    def Euler_Disc(self, plot=False):
-        print(self.dev)
-        print(self.dev * 250 ** .5)    
