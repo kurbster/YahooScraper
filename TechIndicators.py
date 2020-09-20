@@ -7,12 +7,11 @@ Created on Thu Sep 10 18:38:00 2020
 
 import numpy as np
 import pandas as pd
-from pandas_datareader import data as wb
 
 def dictionary_to_function(func):
         def wrap(*a, **kw):
             kwargs = {k : int(v) for k, v in kw.items()}
-            return func(*a, **kwargs)
+            return func(*a, **kwargs).dropna()
         return wrap
     
 # If RSI is > 70 then the asset is over bought
@@ -43,7 +42,7 @@ def RSI(closes, period):
     results['avg loss'] = np.array(avg_loss)
     results['RS'] = results['avg gain'] / results['avg loss']
     results['RSI'] = 100 - (100 / (1 + results['RS']))
-    return results
+    return results['RSI']
     
 # ATR takes certain ranges and finds the true (max) and average range
 # Which is an indicator based on volatility
@@ -53,7 +52,7 @@ def ATR(closes, hi, lo, period):
     results = pd.DataFrame()
     results['TR']  = TrueRange(closes, hi, lo)
     results['ATR'] = results['TR'].rolling(period).mean()
-    return results
+    return results['ATR']
     
 @dictionary_to_function
 def ADX(closes, hi, lo, period):
@@ -87,7 +86,7 @@ def BB(closes, period, stdev):
     results['MA']   = closes.rolling(period).mean()
     results['UP']   = results['MA'] + stdev * results['MA'].rolling(period).std()
     results['DOWN'] = results['MA'] - stdev * results['MA'].rolling(period).std()
-    results.dropna(inplace=True)
+    
     return results
     
 # MACD only uses the 'Adj Close for that stock
@@ -100,22 +99,35 @@ def MACD(closes, slow, fast, signal):
     results['MACD']    = results['MA_fast'] - results['MA_slow']
     results['signal']  = results['MACD'].ewm(span=signal, min_periods=signal).mean()
     results = results.dropna()
-    return results
+    return results['signal']
 
-def get_indicators(stock=False, closes=False, hi=False, lo=False, indicators=False):
-    indicator_data = {}
-    for func, args in indicators.items():
-        indicator_data[func] = []
-        for kwargs in args:
+
+
+def get_indicators(update=False, closes=False, hi=False, lo=False, args=False):
+    if update:
+        kwargs = args[update]
+        if update == 'MACD':
+            return MACD(closes, **kwargs)
+        elif update == 'RSI':
+            return RSI(closes, **kwargs)
+        elif update == 'BB':
+            return BB(closes, **kwargs)
+        elif update == 'ATR':
+            return ATR(closes, hi, lo, **kwargs)
+        else:
+            raise BaseException('We havent added that feature yet') 
+    else:
+        indicator_data = {}
+        for func, kwargs in args.items():
             if func == 'MACD':
-                indicator_data[func].append(MACD(closes, **kwargs))
+                indicator_data[func] = MACD(closes, **kwargs)
             elif func == 'RSI':
-                indicator_data[func].append(RSI(closes, **kwargs))
+                indicator_data[func] = RSI(closes, **kwargs)
             elif func == 'BB':
-                indicator_data[func].append(BB(closes, **kwargs))
+                indicator_data[func] = BB(closes, **kwargs)
             elif func == 'ATR':
-                indicator_data[func].append(ATR(closes, hi, lo, **kwargs))
+                indicator_data[func] = ATR(closes, hi, lo, **kwargs)
             else:
                 raise BaseException('We havent added that feature yet')
 
-    return indicator_data
+        return indicator_data
